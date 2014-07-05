@@ -1,0 +1,17 @@
+.deps/
+Makefile
+config.h
+config.log
+config.status
+libtool
+onig-config
+sample/.deps/
+sample/Makefile
+stamp-h1
+print_regex
+*.o
+*.lo
+sample/*
+.libs/
+libonig.la
+oniguruma.pc
