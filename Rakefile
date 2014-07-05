@@ -1,26 +1,18 @@
-file 'Makefile' => 'configure' do
+c_files           = FileList["*.c"]
+object_files      = FileList["*.o"]
+onig_object_files = object_files - ['print_regex.o']
+ong_c_files       = c_files - ['print_regex.c']
+
+# meh, spent a long time trying to think through this fuck it!
+# although, this was super helpful if I want to come back to it
+# http://jacobswanner.com/2014/03/17/rake-rule-tasks/
+task 'Makefile' do
   sh './configure'
 end
 
-file 'print_regex.c' => 'Makefile'
-file 'print_regex.o' => 'print_regex.c'
-
-task 'make' => 'Makefile' do
+task :default do
   sh 'make'
+  sh 'gcc -c print_regex.c'
+  sh "gcc -o print_regex #{object_files.join(' ')}"
+  sh "./print_regex"
 end
-
-rule '.o' => 'make' do |task|
-  if task.name == 'print_regex.o'
-    sh 'gcc -c print_regex.c'
-  end
-end
-
-rule 'print_regex' => '.o' do |t|
-  puts "now link"
-  sh "gcc -o #{t.name} #{FileList["*.o"].join(' ')}"
-  sh "./#{t.name}"
-end
-
-task 'run' => 'print_regex'
-
-task default: 'run'
