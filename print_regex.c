@@ -6,15 +6,25 @@
 /* #include "regparse.h" */
 #include "oniguruma.h"
 
-extern int main(int argc, char* argv[])
+int main(int argc, char* argv[])
 {
+  /* printf("ARGC=%d\n", argc); */
+  /* printf("ARGV[0]=%s\n", argv[0]); */
+  /* printf("ARGV[1]=%s\n", argv[1]); */
+  /* printf("DONE\n"); */
+
   int r;
   unsigned char *start, *range, *end;
   regex_t* reg;
   OnigErrorInfo einfo;
   OnigRegion *region;
 
-  static UChar* pattern = (UChar* )"a(.*)b|[e-f]+";
+  /* static UChar* pattern = (UChar* )"a(.*)b|[e-f]+"; */
+  /* static UChar* pattern = (UChar* )"a|bcd?e{100}f{2,3}|(-?\d+)"; */
+  UChar* pattern = (UChar* )argv[1];
+  /* static UChar* pattern; */
+  /* pattern = (UChar* )argv[1]; */
+
   static UChar* str     = (UChar* )"zzzzaffffffffb";
 
   r = onig_new(&reg, pattern, pattern + strlen((char* )pattern),
@@ -35,10 +45,10 @@ extern int main(int argc, char* argv[])
   if (r >= 0) {
     int i;
 
-    fprintf(stderr, "match at %d\n", r);
-    for (i = 0; i < region->num_regs; i++) {
-      fprintf(stderr, "%d: (%d-%d)\n", i, region->beg[i], region->end[i]);
-    }
+    // fprintf(stderr, "match at %d\n", r);
+    // for (i = 0; i < region->num_regs; i++) {
+    //   fprintf(stderr, "%d: (%d-%d)\n", i, region->beg[i], region->end[i]);
+    // }
   }
   else if (r == ONIG_MISMATCH) {
     fprintf(stderr, "search fail\n");
