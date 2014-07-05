@@ -6247,10 +6247,13 @@ print_indent_tree(FILE* f, Node* node, int indent)
 }
 
 
+#define BEGIN_JOSH_SECTION "\n=====  BEGIN JOSH SECTION =====\n"
+#define   END_JOSH_SECTION "=====  END JOSH SECTION =====\n"
 
 static void
 josh_print_tree(FILE* f, Node* node, int indent)
 {
+  fprintf(f, BEGIN_JOSH_SECTION);
   int i, type;
   int add = 3;
   UChar* p;
@@ -6409,6 +6412,8 @@ josh_print_tree(FILE* f, Node* node, int indent)
   if (type != NT_LIST && type != NT_ALT && type != NT_QTFR &&
       type != NT_ENCLOSE)
     fprintf(f, "\n");
+
+  fprintf(f, END_JOSH_SECTION);
   fflush(f);
 }
 #endif /* ONIG_DEBUG */
