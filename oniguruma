@@ -1,0 +1,250 @@
+download:
+  http://www.geocities.jp/kosako3/oniguruma/archive/onig-5.9.5.tar.gz
+
+extract:
+  tar -xzf onig-5.9.5.tar.gz
+  cd onig-5.9.5
+
+edit to show interesting stuff:
+  vim regint.h
+  uncomment:
+    33 #define ONIG_DEBUG_PARSE_TREE
+    34 #define ONIG_DEBUG_COMPILE
+
+add c file:
+  simple (included at end): http://www.geocities.jp/kosako3/oniguruma/sample/simple.c
+  complex:                  http://www.geocities.jp/kosako3/oniguruma/sample/sql.c
+
+build and run:
+  ./configure
+  make; and gcc -c f.c; and ls | grep \\.o | grep -v f.o | join | xargs gcc -o f f.o; and ./f
+
+interesting stuff:
+  struct re_pattern_buffer  <-- this is the real data structure, I think
+  regcomp.c:
+    print_indent_tree
+      invoked from main -> onig_new -> onig_compile
+      iterates over the compiled tree, printing it out
+    compile_tree:
+      seems to be where it takes the node tree above and compiles it into instructions for traversing
+      I think it sticks these in *p in re_pattern_buffer
+    OnigOpInfoType OnigOpInfo[]
+      a list of op codes back to their human readable name
+  regint.h: has list of op codes (seems to be a stack based thing for representing a regex in a compiled form)
+    enum OpCode {
+  Structs:
+    typedef struct {
+      void*   onig;
+      size_t  re_nsub;
+      int     comp_options;
+    } regex_t;
+    typedef struct re_pattern_buffer {
+      /* common members of BBuf(bytes-buffer) */
+      unsigned char* p;         /* compiled pattern */
+      unsigned int used;        /* used space for p */
+      unsigned int alloc;       /* allocated space for p */
+
+      int state;                     /* normal, searching, compiling */
+      int num_mem;                   /* used memory(...) num counted from 1 */
+      int num_repeat;                /* OP_REPEAT/OP_REPEAT_NG id-counter */
+      int num_null_check;            /* OP_NULL_CHECK_START/END id counter */
+      int num_comb_exp_check;        /* combination explosion check */
+      int num_call;                  /* number of subexp call */
+      unsigned int capture_history;  /* (?@...) flag (1-31) */
+      unsigned int bt_mem_start;     /* need backtrack flag */
+      unsigned int bt_mem_end;       /* need backtrack flag */
+      int stack_pop_level;
+      int repeat_range_alloc;
+      OnigRepeatRange* repeat_range;
+
+      OnigEncoding      enc;
+      OnigOptionType    options;
+      OnigSyntaxType*   syntax;
+      OnigCaseFoldType  case_fold_flag;
+      void*             name_table;
+
+      /* optimization info (string search, char-map and anchors) */
+      int            optimize;          /* optimize flag */
+      int            threshold_len;     /* search str-length for apply optimize */
+      int            anchor;            /* BEGIN_BUF, BEGIN_POS, (SEMI_)END_BUF */
+      OnigDistance   anchor_dmin;       /* (SEMI_)END_BUF anchor distance */
+      OnigDistance   anchor_dmax;       /* (SEMI_)END_BUF anchor distance */
+      int            sub_anchor;        /* start-anchor for exact or map */
+      unsigned char *exact;
+      unsigned char *exact_end;
+      unsigned char  map[ONIG_CHAR_TABLE_SIZE]; /* used as BM skip or char-map */
+      int           *int_map;                   /* BM skip for exact_len > 255 */
+      int           *int_map_backward;          /* BM skip for backward search */
+      OnigDistance   dmin;                      /* min-distance of exact or map */
+      OnigDistance   dmax;                      /* max-distance of exact or map */
+
+      /* regex_t link chain */
+      struct re_pattern_buffer* chain;  /* escape compile-conflict */
+    } OnigRegexType;
+
+    typedef OnigRegexType*  OnigRegex;
+
+
+My Rakefile
+  c_files           = FileList["*.c"]
+  object_files      = FileList["*.o"]
+  onig_object_files = object_files - ['print_regex.o']
+  ong_c_files       = c_files - ['print_regex.c']
+
+  # meh, spent a long time trying to think through this fuck it!
+  # although, this was super helpful if I want to come back to it
+  # http://jacobswanner.com/2014/03/17/rake-rule-tasks/
+  task 'Makefile' do
+    sh './configure'
+  end
+
+  task :default do
+    sh 'make'
+    sh 'gcc -c print_regex.c'
+    sh "gcc -o print_regex #{object_files.join(' ')}"
+    sh "./print_regex"
+  end
+
+-----
+RegexpParser (gem I found which uses Ragel to parse 1.8 and 1.9 regexes)
+  require 'regexp_parser'
+  regex = /a?(b)*[c]+/m
+  root  = Regexp::Parser.parse(regex.to_s, 'ruby/1.9')
+  def walk(e, depth = 0) # simple tree walking method
+    puts "#{'  ' * depth}> #{e.class}"
+    if e.respond_to?(:expressions) && e.expressions.any?
+      e.each {|s| walk(s, depth+1) }
+    end
+  end
+  walk(root)
+  # >> > Regexp::Expression::Root
+  # >>   > Regexp::Expression::Group::Options
+  # >>     > Regexp::Expression::Literal
+  # >>     > Regexp::Expression::Group::Capture
+  # >>       > Regexp::Expression::Literal
+  # >>     > Regexp::Expression::CharacterSet
+
+
+
+-----
+Regexper:
+
+Links
+  Site: http://www.regexper.com/#%2Fa%5Bbc%5Dd%2F
+  Code: https://github.com/javallone/regexper
+
+Controller:
+  in config.ru
+  just pure rack
+  goes to /parse
+  ultimately boild down to
+    [ 200,
+      {'Content-Type' => 'application/json', 'Cache-Control' => 'no-cache'},
+      JSON.generate({ raw_expr: regexp,
+                      structure: Regexper.parse(regexp).to_obj},
+                    {max_nesting: 1000}
+                   )
+    ]
+
+Example:
+  Invocation:
+    curl http://www.regexper.com/parse -d '/a[bc]de/'
+  Response:
+    HTTP/1.1 200 OK
+    Cache-Control: no-cache
+    Content-Type: application/json
+    Server: thin 1.5.1 codename Straight Razor
+    transfer-encoding: chunked
+    Connection: keep-alive
+
+    {"raw_expr":"/a[bc]de/","structure":{"type":"regexp","range":[1,8],"content":[{"type":"match","range":[1,8],"start":false,"end":false,"content":[{"type":"literal","range":[1,2],"content":"a"},{"type":"cha
+
+  Response broken down:
+    # raw_expr: "/a[bc]de/"
+    # structure                 # wrapper content
+    #   type: "regex"           # root?
+    #   range: [1, 8]           # starts at 1 not 0, last index is 7 (ie 1...8, not 1..8)
+    #   content:
+    #     - type:    "match"    # list of "a", "[bc]", "de" ?
+    #       range:   [1, 8]
+    #       start:   false
+    #       end:     false
+    #       content:
+    #         - type:     "literal"
+    #           range:    [1, 2]
+    #           content:  "a"
+    #         - type:     "charset"
+    #           range:    [2, 6]
+    #           content:
+    #             - type:    "literal"
+    #               range:   [3, 4]
+    #               content: "b"
+    #             - type:    "literal"
+    #               range:   [4, 5]
+    #               content: "c"
+    #           inverted: false      # b/c it/s a charset, so [^a] would be inverted
+    #         - type:     "literal"
+    #           range:    [6, 8]
+    #           content:  "de"
+
+Regex that this handles which regexper's doesn't
+  $ ruby -rshellwords -rmethod_source -e'p Shellwords.method(:split).source[/(?<=\/).*?(?=\/m)/].shellescape'
+
+
+__END__
+/*
+ * simple.c
+ */
+#include <stdio.h>
+#include <string.h>
+#include "oniguruma.h"
+
+extern int main(int argc, char* argv[])
+{
+  int r;
+  unsigned char *start, *range, *end;
+  regex_t* reg;
+  OnigErrorInfo einfo;
+  OnigRegion *region;
+
+  static UChar* pattern = (UChar* )"a(.*)b|[e-f]+";
+  static UChar* str     = (UChar* )"zzzzaffffffffb";
+
+  r = onig_new(&reg, pattern, pattern + strlen((char* )pattern),
+  ONIG_OPTION_DEFAULT, ONIG_ENCODING_ASCII, ONIG_SYNTAX_DEFAULT, &einfo);
+  if (r != ONIG_NORMAL) {
+    char s[ONIG_MAX_ERROR_MESSAGE_LEN];
+    onig_error_code_to_str(s, r, &einfo);
+    fprintf(stderr, "ERROR: %s\n", s);
+    return -1;
+  }
+
+  region = onig_region_new();
+
+  end   = str + strlen((char* )str);
+  start = str;
+  range = end;
+  r = onig_search(reg, str, end, start, range, region, ONIG_OPTION_NONE);
+  if (r >= 0) {
+    int i;
+
+    fprintf(stderr, "match at %d\n", r);
+    for (i = 0; i < region->num_regs; i++) {
+      fprintf(stderr, "%d: (%d-%d)\n", i, region->beg[i], region->end[i]);
+    }
+  }
+  else if (r == ONIG_MISMATCH) {
+    fprintf(stderr, "search fail\n");
+  }
+  else { /* error */
+    char s[ONIG_MAX_ERROR_MESSAGE_LEN];
+    onig_error_code_to_str(s, r);
+    fprintf(stderr, "ERROR: %s\n", s);
+    return -1;
+  }
+
+  onig_region_free(region, 1 /* 1:free self, 0:free contents only */);
+  onig_free(reg);
+  onig_end();
+  return 0;
+}
