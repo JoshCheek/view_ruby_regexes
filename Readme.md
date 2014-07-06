@@ -37,7 +37,7 @@ It is also shitty because this debugging view was not intend for this purpose,
 it was just to give the devs a visualization of what was happening.
 
 Anyway, the program that interacts with it is taken from
-[here])(http://www.geocities.jp/kosako3/oniguruma/sample/simple.c).
+[here](http://www.geocities.jp/kosako3/oniguruma/sample/simple.c).
 It is the sample program that is an "example of the minimum"
 but I changed it slightly, too, to allow the regex to be passed
 in on the command line.
